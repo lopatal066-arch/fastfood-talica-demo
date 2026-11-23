@@ -1,0 +1,272 @@
+﻿<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fast Food Талица — доставка круглосуточно</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --surface:#f7f5f2;
+    --ink:#1c1917;
+    --muted:#6b6560;
+    --accent:#d9481f;
+    --accent-dark:#b03a16;
+    --accent-soft:#fdeee8;
+    --s4:4px; --s8:8px; --s12:12px; --s16:16px; --s24:24px; --s32:32px; --s48:48px; --s64:64px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:16px;line-height:1.55;color:var(--ink);background:var(--bg);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:0 var(--s24)}
+  h1{font-size:38px;line-height:1.1;letter-spacing:-0.02em;font-weight:800;margin-bottom:var(--s16)}
+  h2{font-size:20px;line-height:1.3;font-weight:700;margin-bottom:var(--s8)}
+  .muted{color:var(--muted)}
+  .cap{font-size:16px;color:var(--muted)}
+
+  header{padding:var(--s64) 0 var(--s48)}
+  .badge{
+    display:inline-flex;align-items:center;gap:var(--s8);
+    background:var(--accent-soft);color:var(--accent-dark);
+    padding:var(--s8) var(--s16);border-radius:999px;
+    font-size:16px;font-weight:600;margin-bottom:var(--s24);
+  }
+  .dot{width:8px;height:8px;border-radius:999px;background:var(--accent)}
+  .lead{font-size:16px;color:var(--muted);max-width:52ch}
+
+  section{padding:var(--s48) 0}
+  .section-head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s16);margin-bottom:var(--s24)}
+
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--s16)}
+  @media(max-width:680px){.grid{grid-template-columns:1fr}}
+
+  .item{
+    background:var(--surface);border-radius:16px;padding:var(--s24);
+    display:flex;flex-direction:column;gap:var(--s16);
+  }
+  .item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--s16)}
+  .item-name{font-size:16px;font-weight:650}
+  .price{font-size:20px;font-weight:700;white-space:nowrap}
+  .item-actions{margin-top:auto}
+  .add{
+    width:100%;font:inherit;font-weight:600;cursor:pointer;
+    background:var(--bg);color:var(--ink);
+    border-radius:12px;padding:var(--s12) var(--s16);
+    border:0;
+  }
+  .add:hover{background:var(--accent-soft);color:var(--accent-dark)}
+  .add:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible{
+    outline:3px solid var(--accent);outline-offset:2px
+  }
+  .qty{display:flex;align-items:center;gap:var(--s8);font-weight:600}
+  .qty button{
+    width:32px;height:32px;border-radius:8px;border:0;cursor:pointer;font:inherit;
+    background:var(--bg);color:var(--ink);font-weight:700;
+  }
+  .qty button:hover{background:var(--accent-soft);color:var(--accent-dark)}
+
+  /* заказ */
+  #order{background:var(--surface);border-radius:24px;padding:var(--s32);margin-bottom:var(--s64)}
+  .lines{display:flex;flex-direction:column;gap:var(--s12);margin:var(--s16) 0 var(--s24)}
+  .line{display:flex;justify-content:space-between;gap:var(--s16);font-size:16px}
+  .line span:first-child{flex:1;min-width:0}
+  .line span:last-child{white-space:nowrap}
+  .line.empty{color:var(--muted)}
+  .total{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding-top:var(--s16);margin-top:var(--s8);
+    font-weight:700;font-size:20px;
+  }
+  .fields{display:grid;grid-template-columns:1fr 1fr;gap:var(--s16);margin-bottom:var(--s24)}
+  .fields .full{grid-column:1/-1}
+  @media(max-width:680px){.fields{grid-template-columns:1fr}}
+  label{display:block;font-size:16px;font-weight:600;margin-bottom:var(--s8);color:var(--muted)}
+  input,textarea{
+    width:100%;font:inherit;padding:var(--s12) var(--s16);
+    border-radius:12px;border:0;background:var(--bg);color:var(--ink);
+  }
+  textarea{resize:vertical;min-height:64px}
+  .primary{
+    width:100%;font:inherit;font-size:16px;font-weight:700;cursor:pointer;
+    background:var(--accent);color:#fff;border:0;border-radius:14px;
+    padding:var(--s16) var(--s24);
+  }
+  .primary:hover{background:var(--accent-dark)}
+  .primary:disabled{background:#c9c2bc;cursor:not-allowed}
+  .hint{margin-top:var(--s12);text-align:center}
+
+  footer{padding:0 0 var(--s64)}
+  .note{background:var(--accent-soft);border-radius:16px;padding:var(--s24);font-size:16px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="badge"><span class="dot"></span> Доставка круглосуточно · Талица</div>
+    <h1>Горячая еда за 30 минут —<br>даже ночью</h1>
+    <p class="lead">Соберите заказ на этой странице, оставьте адрес — и мы привезём.
+      Никакой переписки «что есть? сколько стоит?»: всё меню и цены перед вами.</p>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <h2>Меню</h2>
+      <span class="cap">Цены за порцию</span>
+    </div>
+    <div class="grid" id="menu">
+      <article class="item" data-id="shaverma" data-name="Шаурма с картофелем фри" data-price="400">
+        <div class="item-top"><span class="item-name">Шаурма с картофелем фри</span><span class="price">400 ₽</span></div>
+        <div class="item-actions"><button class="add" type="button">Добавить</button></div>
+      </article>
+      <article class="item" data-id="fries" data-name="Картофель фри" data-price="250">
+        <div class="item-top"><span class="item-name">Картофель фри</span><span class="price">250 ₽</span></div>
+        <div class="item-actions"><button class="add" type="button">Добавить</button></div>
+      </article>
+      <article class="item" data-id="potato" data-name="Картофель по-деревенски" data-price="140">
+        <div class="item-top"><span class="item-name">Картофель по-деревенски</span><span class="price">140 ₽</span></div>
+        <div class="item-actions"><button class="add" type="button">Добавить</button></div>
+      </article>
+      <article class="item" data-id="nuggets" data-name="Наггетсы" data-price="270">
+        <div class="item-top"><span class="item-name">Наггетсы</span><span class="price">270 ₽</span></div>
+        <div class="item-actions"><button class="add" type="button">Добавить</button></div>
+      </article>
+    </div>
+  </section>
+
+  <section id="order">
+    <h2>Ваш заказ</h2>
+    <div class="lines" id="lines">
+      <div class="line empty"><span>Пока пусто — добавьте что-нибудь из меню</span><span>0 ₽</span></div>
+    </div>
+    <div class="total"><span>Итого</span><span id="total">0 ₽</span></div>
+
+    <div class="fields" style="margin-top:var(--s24)">
+      <div>
+        <label for="f-name">Имя</label>
+        <input id="f-name" type="text" autocomplete="name" placeholder="Как к вам обращаться">
+      </div>
+      <div>
+        <label for="f-phone">Телефон</label>
+        <input id="f-phone" type="tel" autocomplete="tel" placeholder="+7 900 000-00-00">
+      </div>
+      <div class="full">
+        <label for="f-addr">Адрес доставки</label>
+        <textarea id="f-addr" placeholder="Улица, дом, квартира, подъезд"></textarea>
+      </div>
+    </div>
+
+    <button class="primary" id="send" type="button" disabled>Отправить заказ в ВК</button>
+    <p class="hint cap">Заказ откроется в чате сообщества — останется нажать «Отправить».</p>
+  </section>
+
+  <footer>
+    <div class="note">
+      <strong>Демо-страница.</strong> Сделана по вашему сообществу как пример: позиции, цены
+      и оформление заказа соберём под вас — с вашими фото, комбо и условиями доставки.
+    </div>
+  </footer>
+</div>
+
+<script>
+  const CHAT_URL = "https://vk.me/market-102868547";
+  const cart = new Map();
+  const menu = [...document.querySelectorAll("#menu .item")];
+
+  const linesEl = document.getElementById("lines");
+  const totalEl = document.getElementById("total");
+  const sendEl = document.getElementById("send");
+
+  const money = (n) => n.toLocaleString("ru-RU") + " ₽";
+
+  function render() {
+    linesEl.textContent = "";
+    let total = 0;
+    if (cart.size === 0) {
+      const empty = document.createElement("div");
+      empty.className = "line empty";
+      empty.innerHTML = "<span>Пока пусто — добавьте что-нибудь из меню</span><span>0 ₽</span>";
+      linesEl.appendChild(empty);
+    }
+    for (const [id, { name, price, qty }] of cart) {
+      const sum = price * qty;
+      total += sum;
+      const row = document.createElement("div");
+      row.className = "line";
+      const left = document.createElement("span");
+      left.textContent = name + " × " + qty;
+      const right = document.createElement("span");
+      right.textContent = money(sum);
+      row.append(left, right);
+      linesEl.appendChild(row);
+    }
+    totalEl.textContent = money(total);
+    sendEl.disabled = cart.size === 0;
+    menu.forEach((card) => {
+      const id = card.dataset.id;
+      const slot = card.querySelector(".item-actions");
+      const current = cart.get(id);
+      if (!current) {
+        slot.innerHTML = '<button class="add" type="button">Добавить</button>';
+      } else {
+        slot.innerHTML =
+          '<div class="qty"><button type="button" data-op="minus" data-id="' + id + '" aria-label="Убрать одну">−</button>' +
+          "<span>" + current.qty + " шт.</span>" +
+          '<button type="button" data-op="plus" data-id="' + id + '" aria-label="Добавить одну">+</button></div>';
+      }
+    });
+  }
+
+  function add(id) {
+    const card = menu.find((c) => c.dataset.id === id);
+    cart.set(id, { name: card.dataset.name, price: Number(card.dataset.price), qty: 1 });
+    render();
+  }
+
+  function change(id, delta) {
+    const cur = cart.get(id);
+    if (!cur) return;
+    cur.qty += delta;
+    if (cur.qty <= 0) cart.delete(id);
+    render();
+  }
+
+  document.getElementById("menu").addEventListener("click", (e) => {
+    const op = e.target.closest("[data-op]");
+    if (op) {
+      change(op.dataset.id, op.dataset.op === "plus" ? 1 : -1);
+      return;
+    }
+    const btn = e.target.closest(".add");
+    if (!btn) return;
+    const card = btn.closest(".item");
+    if (card) add(card.dataset.id);
+  });
+
+  sendEl.addEventListener("click", () => {
+    const name = document.getElementById("f-name").value.trim();
+    const phone = document.getElementById("f-phone").value.trim();
+    const addr = document.getElementById("f-addr").value.trim();
+    if (!name || !phone || !addr) {
+      alert("Заполните имя, телефон и адрес — иначе не сможем привезти заказ.");
+      return;
+    }
+    const items = [...cart.values()].map((i) => "• " + i.name + " × " + i.qty + " — " + money(i.price * i.qty)).join("\n");
+    const total = [...cart.values()].reduce((s, i) => s + i.price * i.qty, 0);
+    const text =
+      "Заказ с сайта\n" + items + "\nИтого: " + money(total) +
+      "\n\nИмя: " + name + "\nТелефон: " + phone + "\nАдрес: " + addr;
+
+    navigator.clipboard?.writeText(text).catch(() => {});
+    window.open(CHAT_URL, "_blank", "noopener");
+    alert("Текст заказа скопирован — вставьте его в чат и нажмите «Отправить».");
+  });
+
+  render();
+</script>
+</body>
+</html>
