@@ -920,6 +920,13 @@ function addPieces(sharpLayer, blurLayer, slot, source) {
         }
       });
       target.holder.add(clone);
+      // каждый кусочек крутится сам, со своей скоростью и направлением
+      slot.pieceNodes = slot.pieceNodes || [];
+      slot.pieceNodes.push({
+        node: clone,
+        speed: 0.0007 + Math.random() * 0.0011,
+        dir: Math.random() < 0.5 ? -1 : 1
+      });
     }
   };
 
@@ -1032,6 +1039,10 @@ function tick(now) {
     slot.spin += (slot.targetSpin - slot.spin) * Math.min(1, dt * 0.0022); // плавное сглаживание
     if (slot.model) slot.model.rotation.y = (MODEL_ROT[GLB_FOR[slot.key]] || [0, 0.5])[1] + slot.spin * 0.6;
 
+    if (slot.pieceNodes) {
+      for (const p of slot.pieceNodes) p.node.rotation.y += p.speed * p.dir;
+    }
+
     const sizeCheck = (layer) => {
       if (!layer) return;
       const cw = layer.canvas.clientWidth || 1, ch = layer.canvas.clientHeight || 1;
@@ -1046,6 +1057,8 @@ function tick(now) {
   }
   requestAnimationFrame(tick);
 }
+
+window.__pieceRot = () => (slides[active] && slides[active].pieceNodes || []).map((p) => Number(p.node.rotation.y.toFixed(3)));
 
 activate(0);
 requestAnimationFrame(tick);
