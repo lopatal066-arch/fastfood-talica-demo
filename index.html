@@ -37,7 +37,8 @@
     transform-style: preserve-3d;
     will-change: transform;
   }
-  .layer { position: absolute; inset: 0; will-change: transform; }
+  .layer { position: absolute; inset: 0; will-change: transform; pointer-events: none; }
+  .layer.bottle { pointer-events: auto; }
 
   /* глубина сцены: слои висят на разной высоте по Z */
   .layer.word   { translate: 0 0 -150px; }
@@ -60,7 +61,7 @@
 
   .hero { position: absolute; inset: 0; transform-style: preserve-3d; }
   .hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-  .hero canvas.hero-blur { filter: blur(calc(9 * var(--u))); }
+  .hero canvas.hero-blur { filter: blur(calc(9 * var(--u))); pointer-events: none; }
 
   .piece { position: absolute; transform-style: preserve-3d; display: none; }
   .piece > .inner {
@@ -957,6 +958,42 @@ function buildSlide(slot) {
     model.position.z -= c.z;
     model.position.y += -0.55 - box2.min.y;
 
+    // котлета в сэндвиче красилась в цвет палитры неправильно — задаём свой
+    if (slot.key === "shawerma") {
+      model.traverse((o) => {
+        if (o.isMesh && o.name === "meat" && o.material) {
+          const m = Array.isArray(o.material) ? o.material[0] : o.material;
+          m.map = null;
+          m.color.set(0x9C5A2E);
+          m.roughness = 0.9;
+          m.metalness = 0;
+          m.needsUpdate = true;
+        }
+      });
+    }
+
+    // запоминаем части, чтобы «разбирать» модель при наведении:
+    // слои расходим симметрично по высоте — стопка разъезжается, но центр остаётся
+    const centerBox = new THREE.Box3().setFromObject(model);
+    const center = centerBox.getCenter(new THREE.Vector3());
+    const raw = [];
+    model.traverse((o) => {
+      if (!o.isMesh) return;
+      const world = new THREE.Vector3();
+      o.getWorldPosition(world);
+      const local = model.worldToLocal(world.clone());
+      raw.push({ mesh: o, y: local.y - center.y });
+    });
+    const levels = [...new Set(raw.map((r) => Math.round(r.y * 20) / 20))].sort((a, b) => a - b);
+    const spread = 0.105;
+    slot.parts = raw.map((r) => {
+      const idx = levels.indexOf(Math.round(r.y * 20) / 20);
+      const offset = new THREE.Vector3(0, (idx - (levels.length - 1) / 2) * spread, 0);
+      return { mesh: r.mesh, base: r.mesh.position.clone(), offset };
+    });
+    slot.explode = 0;
+    slot.explodeTarget = 0;
+
     slot.sharpLayer.holder.add(shadowMesh());
     slot.sharpLayer.holder.add(model);
 
@@ -1011,6 +1048,22 @@ function activate(index) {
 window.addEventListener("slider:change", (e) => activate(e.detail && e.detail.index));
 window.addEventListener("resize", sizeAll);
 
+// наведение: модель разбирается на части, убираешь курсор — собирается
+// «навёл на блюдо» считаем по расстоянию до центра экрана:
+// навёл мышку на модель — разобралась, увёл — собралась
+window.addEventListener("pointermove", (e) => {
+  const slot = slides[active];
+  if (!slot) return;
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight * 0.52;
+  const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
+  slot.explodeTarget = dist < Math.min(window.innerWidth, window.innerHeight) * 0.34 ? 1 : 0;
+});
+window.addEventListener("pointerleave", () => {
+  const slot = slides[active];
+  if (slot) slot.explodeTarget = 0;
+});
+
 // плавное вращение: отпустили — модель мягко доезжает
 for (const slot of slides) {
   let dragging = false, lastX = 0;
@@ -1043,6 +1096,15 @@ function tick(now) {
       for (const p of slot.pieceNodes) p.node.rotation.y += p.speed * p.dir;
     }
 
+    // плавно разбираем/собираем
+    if (slot.parts && slot.parts.length) {
+      slot.explode += ((slot.explodeTarget || 0) - slot.explode) * Math.min(1, dt * 0.006);
+      const k = slot.explode;
+      for (const part of slot.parts) {
+        part.mesh.position.copy(part.base).addScaledVector(part.offset, k);
+      }
+    }
+
     const sizeCheck = (layer) => {
       if (!layer) return;
       const cw = layer.canvas.clientWidth || 1, ch = layer.canvas.clientHeight || 1;
@@ -1059,6 +1121,29 @@ function tick(now) {
 }
 
 window.__pieceRot = () => (slides[active] && slides[active].pieceNodes || []).map((p) => Number(p.node.rotation.y.toFixed(3)));
+
+window.__explode = () => slides.map((s) => ({ key: s.key, ex: Number((s.explode || 0).toFixed(2)), tgt: s.explodeTarget || 0, parts: (s.parts || []).length }));
+
+window.__mats = () => {
+  const out = [];
+  for (const slot of slides) {
+    if (!slot.model) continue;
+    slot.model.traverse((o) => {
+      if (o.isMesh) {
+        const m = Array.isArray(o.material) ? o.material[0] : o.material;
+        out.push({
+          slide: slot.key,
+          mesh: o.name || "(без имени)",
+          mat: m.name || "(без имени)",
+          color: m.color ? "#" + m.color.getHexString() : null,
+          hasMap: !!m.map,
+          posY: Number((o.position ? o.position.y : 0).toFixed(3))
+        });
+      }
+    });
+  }
+  return out;
+};
 
 activate(0);
 requestAnimationFrame(tick);
