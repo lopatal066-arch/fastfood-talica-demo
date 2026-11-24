@@ -60,18 +60,14 @@
 
   .hero { position: absolute; transform-style: preserve-3d; }
   .hero-card {
-    width: 100%; height: 100%; border-radius: calc(22 * var(--u));
-    overflow: hidden; transform-style: preserve-3d;
-    box-shadow:
-      0 calc(18 * var(--u)) calc(38 * var(--u)) rgba(60, 40, 80, 0.18),
-      0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(60, 40, 80, 0.12);
+    width: 100%; height: 100%;
+    overflow: visible; transform-style: preserve-3d;
   }
-  .hero-card img {
-    width: 100%; height: 100%; object-fit: cover; display: block;
-    mix-blend-mode: multiply;
+  .hero-card canvas {
+    width: 100%; height: 100%; display: block;
   }
 
-  .piece { position: absolute; transform-style: preserve-3d; }
+  .piece { position: absolute; transform-style: preserve-3d; display: none; }
   .piece > .inner {
     width: 100%; height: 100%;
     background-size: contain; background-repeat: no-repeat; background-position: center;
@@ -301,10 +297,11 @@
     hero.className = "hero";
     const card = document.createElement("div");
     card.className = "hero-card";
-    const img = document.createElement("img");
-    img.src = cfg.img;
-    img.alt = cfg.word;
-    card.appendChild(img);
+    // 3D-модель вместо плоского фото
+    const canvas = document.createElement("canvas");
+    canvas.className = "hero-3d";
+    canvas.dataset.model = cfg.key;
+    card.appendChild(canvas);
     hero.appendChild(card);
     layers.bottle.appendChild(hero);
 
@@ -503,6 +500,11 @@
     }, 280);
   }
 
+  // сообщаем 3D-слою, какой слайд активен (он рисует только его)
+  function announce(index) {
+    window.dispatchEvent(new CustomEvent("slider:change", { detail: { index } }));
+  }
+
   function goTo(index, dir) {
     if (busy || index === current) return;
     const A = built[current];
@@ -515,6 +517,7 @@
       B.section.classList.add("on");
       current = index;
       setPrice(index, false);
+      announce(index);
       return;
     }
 
@@ -560,6 +563,7 @@
       current = index;
       busy = false;
       setPrice(index, true);
+      announce(index);
     }
 
     requestAnimationFrame(frame);
@@ -635,6 +639,7 @@
     setPrice(0, false);
     placeUnderline(false);
     reveal();
+    announce(0);
   }
 
   if (document.fonts && document.fonts.ready) {
@@ -645,5 +650,249 @@
   window.addEventListener("load", () => layout());
 })();
 </script>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+
+﻿// ---------- материалы ----------
+const mat = (color, rough = 0.85, metal = 0) =>
+  new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, flatShading: true });
+
+const C = {
+  lavash: 0xE8C29B, meat: 0xB9643C, lettuce: 0x7FB069, tomato: 0xD64545,
+  foil: 0xCFCFCF, cupRed: 0xD9422E, cupPaper: 0xF7E7CF, fry: 0xF2C14E,
+  tray: 0xF0DFC4, potato: 0xD79C4A, nugget: 0xE0A85C
+};
+
+// ---------- модели ----------
+function buildShawerma() {
+  const g = new THREE.Group();
+
+  // сам ролл
+  const wrap = new THREE.Mesh(new THREE.CylinderGeometry(0.40, 0.45, 1.55, 16, 1), mat(C.lavash));
+  g.add(wrap);
+
+  // тёмная полоса бумаги посередине
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.415, 0.452, 0.46, 16, 1, true), mat(0xD9B183, 0.95));
+  band.position.y = -0.2;
+  g.add(band);
+
+  // фольга снизу — узкая, как обёртка
+  const foil = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.40, 0.42, 16), mat(C.foil, 0.3, 0.8));
+  foil.position.y = -0.66;
+  g.add(foil);
+
+  // мясо — видно сверху
+  const meat = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.28, 0.22, 12), mat(C.meat, 0.9));
+  meat.position.y = 0.72;
+  g.add(meat);
+
+  // начинка торчит из ролла
+  const bits = [
+    [C.lettuce, 0.13, 0.84, 0.06, 0.13],
+    [C.tomato, -0.14, 0.8, 0.09, 0.11],
+    [C.lettuce, 0.03, 0.9, -0.1, 0.11],
+    [C.meat, 0.17, 0.76, -0.07, 0.12],
+    [C.tomato, -0.02, 0.78, 0.15, 0.1]
+  ];
+  for (const [color, x, y, z, s] of bits) {
+    const b = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), mat(color));
+    b.position.set(x, y, z);
+    b.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+    g.add(b);
+  }
+
+  // наклон, как будто ролл в руке
+  g.rotation.z = -0.34;
+  g.rotation.x = 0.08;
+  return g;
+}
+
+function buildFries() {
+  const g = new THREE.Group();
+
+  // стакан
+  const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.32, 0.95, 4, 1, true), mat(C.cupRed, 0.75));
+  cup.rotation.y = Math.PI / 4;
+  cup.position.y = -0.25;
+  g.add(cup);
+
+  const cupBottom = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.06, 4), mat(C.cupRed, 0.75));
+  cupBottom.rotation.y = Math.PI / 4;
+  cupBottom.position.y = -0.72;
+  g.add(cupBottom);
+
+  // картошка
+  for (let i = 0; i < 16; i++) {
+    const f = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.72, 0.09), mat(C.fry, 0.8));
+    const a = (i / 16) * Math.PI * 2;
+    const r = 0.1 + Math.random() * 0.22;
+    f.position.set(Math.cos(a) * r, 0.25 + Math.random() * 0.12, Math.sin(a) * r);
+    f.rotation.set((Math.random() - 0.5) * 0.5, Math.random() * 3, (Math.random() - 0.5) * 0.5);
+    g.add(f);
+  }
+  return g;
+}
+
+function buildWedges() {
+  const g = new THREE.Group();
+
+  // картонная подложка
+  const tray = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.1, 0.9), mat(C.tray, 0.95));
+  tray.position.y = -0.5;
+  g.add(tray);
+
+  // дольки
+  for (let i = 0; i < 9; i++) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.55, 6), mat(C.potato, 0.95));
+    const row = Math.floor(i / 3), col = i % 3;
+    w.position.set(-0.35 + col * 0.35 + (Math.random() - 0.5) * 0.08,
+      -0.22 + row * 0.14,
+      -0.15 + row * 0.12 + (Math.random() - 0.5) * 0.1);
+    w.rotation.set(Math.PI / 2 + (Math.random() - 0.5) * 0.4, Math.random() * 3, (Math.random() - 0.5) * 0.5);
+    g.add(w);
+  }
+  return g;
+}
+
+function buildNuggets() {
+  const g = new THREE.Group();
+
+  const tray = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.12, 0.85), mat(C.tray, 0.95));
+  tray.position.y = -0.45;
+  g.add(tray);
+
+  const spots = [[-0.28, 0.02, -0.16], [0.24, 0.02, -0.12], [-0.05, 0.02, 0.18], [0.3, 0.02, 0.22], [-0.32, 0.02, 0.2]];
+  for (const [x, y, z] of spots) {
+    const n = new THREE.Mesh(new THREE.IcosahedronGeometry(0.24, 0), mat(C.nugget, 0.9));
+    n.position.set(x, y, z);
+    n.scale.set(1.35, 0.72, 1);
+    n.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+    g.add(n);
+  }
+  return g;
+}
+
+
+// ---------- 4 canvas, по одному на слайд ----------
+const BUILD = {
+  shawerma: buildShawerma,
+  fries: buildFries,
+  village: buildWedges,
+  nuggets: buildNuggets
+};
+
+const items = [...document.querySelectorAll("canvas.hero-3d")].map((canvas) => ({
+  canvas,
+  key: canvas.dataset.model,
+  built: false,
+  spin: 0,
+  targetSpin: 0
+}));
+
+let active = 0;
+
+function makeShadowTexture() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const x = c.getContext("2d");
+  const g = x.createRadialGradient(64, 64, 4, 64, 64, 62);
+  g.addColorStop(0, "rgba(60,40,80,0.34)");
+  g.addColorStop(1, "rgba(60,40,80,0)");
+  x.fillStyle = g;
+  x.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}
+const shadowTex = makeShadowTexture();
+
+function build(item) {
+  if (item.built) return;
+  const renderer = new THREE.WebGLRenderer({ canvas: item.canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
+  camera.position.set(0, 0.42, 3.75);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 1.1));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 2.1);
+  keyLight.position.set(2.2, 3.4, 2.6);
+  scene.add(keyLight);
+  const fillLight = new THREE.DirectionalLight(0xffd9b3, 0.9);
+  fillLight.position.set(-2.4, 1.2, 1.4);
+  scene.add(fillLight);
+
+  const shadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.6, 1.5),
+    new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = -0.98;
+  scene.add(shadow);
+
+  const holder = new THREE.Group();
+  const model = (BUILD[item.key] || buildShawerma)();
+  model.position.y = 0.05;
+  holder.add(model);
+  scene.add(holder);
+
+  Object.assign(item, { renderer, scene, camera, holder, built: true });
+  size(item);
+}
+
+function size(item) {
+  if (!item.built) return;
+  const w = item.canvas.clientWidth || 1;
+  const h = item.canvas.clientHeight || 1;
+  item.renderer.setSize(w, h, false);
+  item.camera.aspect = w / h;
+  item.camera.updateProjectionMatrix();
+}
+
+function activate(index) {
+  active = Number(index) || 0;
+  const item = items[active];
+  if (!item) return;
+  build(item);
+  size(item);
+}
+
+window.addEventListener("slider:change", (e) => activate(e.detail && e.detail.index));
+window.addEventListener("resize", () => items.forEach(size));
+
+for (const item of items) {
+  let dragging = false, lastX = 0;
+  item.canvas.addEventListener("pointerdown", (e) => {
+    dragging = true; lastX = e.clientX;
+    e.stopPropagation();
+  });
+  window.addEventListener("pointerup", () => { dragging = false; });
+  window.addEventListener("pointermove", (e) => {
+    if (!dragging || items[active] !== item) return;
+    item.targetSpin += (e.clientX - lastX) * 0.012;
+    lastX = e.clientX;
+  });
+}
+
+function tick() {
+  const item = items[active];
+  if (item && item.built) {
+    item.targetSpin += 0.004;
+    item.spin += (item.targetSpin - item.spin) * 0.08;
+    item.holder.rotation.y = item.spin;
+    // если canvas ещё не получил размер (шрифты/раскладка позже) — подгоняем
+    const cw = item.canvas.clientWidth || 1, ch = item.canvas.clientHeight || 1;
+    if (cw !== item.lastW || ch !== item.lastH) { item.lastW = cw; item.lastH = ch; size(item); }
+    item.renderer.render(item.scene, item.camera);
+  }
+  requestAnimationFrame(tick);
+}
+
+activate(0);
+requestAnimationFrame(tick);
+</script>
+
 </body>
 </html>
